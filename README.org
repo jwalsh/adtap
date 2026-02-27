@@ -29,6 +29,13 @@ ADTAP is *NOT* designed for:
 - Automating campaign management
 - Making any changes to Google Ads accounts
 - Production ad operations
+- Productionized data pipelines
+- High-efficiency batch processing
+- Production ETL workflows
+
+This is an *exploration tool*, not a production system. While we reference
+[[https://developers.google.com/google-ads/api/videos/catalog/best-practices-1][best practices]] for understanding API patterns (SearchStream vs Search vs Get),
+our goal is learning and documentation, not operational efficiency.
 
 * Getting Started
 
