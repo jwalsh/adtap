@@ -66,11 +66,20 @@ refinery/
 mayor/
 polecats/
 crew/
+daemon/
+plugins/
+
+# Gastown rig directory (created by gt rig add)
+adtap/
+
+# Gastown event log
+.events.jsonl
 
 # Beads - track config, ignore runtime data
 .beads/*.db
 .beads/*.db-*
 .beads/*.db-journal
+.beads/routes.jsonl
 
 # CPRR - track conjectures (similar to beads)
 # .cprr/ is tracked
