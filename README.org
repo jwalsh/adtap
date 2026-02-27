@@ -1,0 +1,203 @@
+#+TITLE: ADTAP - Google Ads API Tools and Patterns
+#+AUTHOR: aygp-dr
+#+DATE: 2026-02-27
+
+* Overview
+
+ADTAP provides tools, documentation, and patterns for working with the Google Ads API v23.
+
+* Getting Started
+
+** Prerequisites
+
+1. A Google Ads Manager Account
+2. A Google Cloud Project with billing enabled
+3. A Google Ads Developer Token
+4. Service Account credentials (JSON)
+
+** Step 1: Obtain a Developer Token
+
+A developer token is a 22-character alphanumeric string that lets your app connect to the Google Ads API.
+
+*** Create or Select a Manager Account
+
+Use an email address that has *not* been previously associated with any Google Ads account.
+
+*** Apply for API Access
+
+1. Navigate to [[https://ads.google.com/aw/apicenter][API Center]] in your Google Ads manager account
+2. Complete the API Access form with:
+   - Accurate company details
+   - A functioning website URL
+   - Valid API contact email (monitor this for review communications)
+
+*** Access Levels
+
+| Level        | Description                                      |
+|--------------+--------------------------------------------------|
+| Test Account | Limited to test accounts only                    |
+| Basic        | Standard access after approval                   |
+| Standard     | Full capabilities with higher rate limits        |
+
+Reference: [[https://developers.google.com/google-ads/api/docs/api-policy/developer-token][Developer Token Documentation]]
+
+** Step 2: Set Up Google Cloud Credentials
+
+*** Create a Service Account
+
+#+begin_src bash
+# Create service account
+gcloud iam service-accounts create google-ads-api \
+    --display-name="Google Ads API Service Account"
+
+# Download credentials
+gcloud iam service-accounts keys create credentials.json \
+    --iam-account=google-ads-api@YOUR_PROJECT_ID.iam.gserviceaccount.com
+#+end_src
+
+*** Configure Environment
+
+Copy the example environment file and fill in your values:
+
+#+begin_src bash
+cp .env.example .env
+#+end_src
+
+Edit =.env= with your credentials:
+
+#+begin_src bash
+GOOGLE_APPLICATION_CREDENTIALS=/path/to/your/credentials.json
+GOOGLE_PROJECT_ID=your-project-id
+GOOGLE_ADS_DEVELOPER_TOKEN=your-22-char-developer-token
+#+end_src
+
+** Step 3: Using with MCP Server
+
+The Google Ads MCP server allows Claude to interact with the Google Ads API.
+
+*** Claude Desktop Configuration
+
+Add to your =claude_desktop_config.json=:
+
+#+begin_src json
+{
+  "mcpServers": {
+    "google-ads-mcp": {
+      "command": "pipx",
+      "args": [
+        "run",
+        "--spec",
+        "git+https://github.com/googleads/google-ads-mcp.git",
+        "google-ads-mcp"
+      ],
+      "env": {
+        "GOOGLE_APPLICATION_CREDENTIALS": "/path/to/your/credentials.json",
+        "GOOGLE_PROJECT_ID": "YOUR_PROJECT_ID",
+        "GOOGLE_ADS_DEVELOPER_TOKEN": "YOUR_DEVELOPER_TOKEN"
+      }
+    }
+  }
+}
+#+end_src
+
+** Step 4: Test Your Setup
+
+*** Using Test Accounts
+
+For initial development, use test accounts to avoid affecting production data:
+
+#+begin_src bash
+# Test accounts don't serve ads and have no spending limits
+# Create via: Google Ads UI > Tools & Settings > Setup > Test accounts
+#+end_src
+
+*** Verify API Access
+
+#+begin_src python
+from google.ads.googleads.client import GoogleAdsClient
+
+client = GoogleAdsClient.load_from_storage("google-ads.yaml")
+customer_service = client.get_service("CustomerService")
+
+# List accessible customers
+accessible_customers = customer_service.list_accessible_customers()
+print(f"Accessible customers: {accessible_customers.resource_names}")
+#+end_src
+
+* Project Structure
+
+#+begin_example
+adtap/
+├── .env.example              # Environment variable template
+├── README.org                # This file
+├── CLAUDE.md                 # Claude Code project instructions
+├── docs/
+│   ├── references.org        # External references and links
+│   └── google-ads-api-v23-diagrams.org  # Entity diagrams (ERD, state, sequence)
+└── vendor/                   # Git submodules for reference
+    ├── google-ads-mcp/       # MCP server for Claude integration
+    ├── google-ads-api-developer-assistant/  # Gemini CLI extension
+    └── google-ads-pb/        # Go protobuf implementation
+#+end_example
+
+* Vendor Submodules
+
+Related projects included as git submodules for review:
+
+| Submodule | Description | Version |
+|-----------+-------------+---------|
+| [[./vendor/google-ads-mcp/][google-ads-mcp]] | MCP server for LLM integration | main |
+| [[./vendor/google-ads-api-developer-assistant/][google-ads-api-developer-assistant]] | Gemini CLI extension for natural language API interaction | v2.0 |
+| [[./vendor/google-ads-pb/][google-ads-pb]] | Go protobuf implementation | v1.23.0 |
+
+** Initialize Submodules
+
+After cloning this repository:
+
+#+begin_src bash
+git submodule update --init --recursive
+#+end_src
+
+** google-ads-mcp
+
+MCP server providing tools for LLM interaction with Google Ads API:
+- =search= - Retrieve account information via GAQL
+- =list_accessible_customers= - List accessible customer accounts
+
+** google-ads-api-developer-assistant
+
+Gemini CLI extension for natural language interaction:
+- Natural language to GAQL conversion
+- Code generation in Python, Ruby, PHP
+- Direct API execution from terminal
+- CSV export of results
+
+** google-ads-pb
+
+Go implementation of Google Ads API protobufs for building Go clients.
+
+* API Version
+
+This project targets *Google Ads API v23* (released January 2026).
+
+| Version | Status    | Sunset Date |
+|---------+-----------+-------------|
+| v23     | Current   | TBD         |
+| v22     | Supported | TBD         |
+| v21     | Supported | TBD         |
+| v20     | Supported | TBD         |
+| v10     | Sunset    | 2023-02-01  |
+
+See [[https://developers.google.com/google-ads/api/docs/sunset-dates][Deprecation and Sunset Dates]] for current schedule.
+
+* Resources
+
+- [[https://developers.google.com/google-ads/api/reference/rpc/v23/overview][Google Ads API v23 Reference]]
+- [[https://github.com/googleapis/googleapis/tree/master/google/ads/googleads][Official Protobuf Definitions]]
+- [[https://github.com/shenzhencenter/google-ads-pb][Go Protobuf Implementation]]
+- [[https://github.com/googleads/google-ads-python][Python Client Library]]
+- [[https://github.com/googleads/google-ads-mcp][Google Ads MCP Server]]
+
+* License
+
+TBD
