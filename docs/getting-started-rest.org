@@ -1,0 +1,229 @@
+#+TITLE: Getting Started with the REST API
+#+AUTHOR: aygp-dr
+#+DATE: 2026-02-27
+#+OPTIONS: toc:2
+
+* Overview
+
+The Google Ads API supports two transports: gRPC (Protocol Buffers) and REST
+(JSON). This guide covers REST basics for read-only exploration using tools
+like cURL.
+
+Reference: [[https://developers.google.com/google-ads/api/videos/catalog/working-with-rest-1][Working with REST Video]]
+
+* Transport Comparison
+
+| Aspect | REST | gRPC |
+|--------+------+------|
+| Format | JSON | Protocol Buffers |
+| Tools | cURL, any HTTP client | gRPC clients |
+| Ease of use | Simpler to start | More efficient |
+| Best for | Exploration, debugging | Production |
+
+For exploration purposes, REST is often easier to work with directly.
+
+* Base URL
+
+All REST endpoints use this base URL:
+
+#+begin_example
+https://googleads.googleapis.com/v23/
+#+end_example
+
+* Authentication
+
+Every request requires:
+
+1. *OAuth 2.0 Access Token* - Bearer token in Authorization header
+2. *Developer Token* - In =developer-token= header
+3. *Customer ID* - In URL path (without hyphens)
+
+** Headers Required
+
+#+begin_src http
+Authorization: Bearer <access_token>
+developer-token: <your_developer_token>
+Content-Type: application/json
+#+end_src
+
+* Resource Naming
+
+Google Ads API uses hierarchical resource names:
+
+#+begin_example
+customers/{customer_id}/campaigns/{campaign_id}
+customers/{customer_id}/adGroups/{ad_group_id}
+customers/{customer_id}/adGroupAds/{ad_group_id}~{ad_id}
+#+end_example
+
+* Making Requests with cURL
+
+** Search Request (Read-Only)
+
+The primary method for exploration is =GoogleAdsService.Search=:
+
+#+begin_src bash
+curl -X POST \
+  "https://googleads.googleapis.com/v23/customers/1234567890/googleAds:search" \
+  -H "Authorization: Bearer ${ACCESS_TOKEN}" \
+  -H "developer-token: ${DEVELOPER_TOKEN}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "SELECT campaign.id, campaign.name FROM campaign LIMIT 10"
+  }'
+#+end_src
+
+** SearchStream (Streaming Results)
+
+For larger result sets:
+
+#+begin_src bash
+curl -X POST \
+  "https://googleads.googleapis.com/v23/customers/1234567890/googleAds:searchStream" \
+  -H "Authorization: Bearer ${ACCESS_TOKEN}" \
+  -H "developer-token: ${DEVELOPER_TOKEN}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "SELECT campaign.id, campaign.name, metrics.clicks FROM campaign WHERE segments.date DURING LAST_30_DAYS"
+  }'
+#+end_src
+
+* Response Format
+
+Responses are JSON with this structure:
+
+#+begin_src json
+{
+  "results": [
+    {
+      "campaign": {
+        "resourceName": "customers/1234567890/campaigns/111111",
+        "id": "111111",
+        "name": "My Campaign"
+      }
+    }
+  ],
+  "fieldMask": "campaign.id,campaign.name",
+  "requestId": "abc123"
+}
+#+end_src
+
+* List Accessible Customers
+
+Find which accounts you can access:
+
+#+begin_src bash
+curl -X GET \
+  "https://googleads.googleapis.com/v23/customers:listAccessibleCustomers" \
+  -H "Authorization: Bearer ${ACCESS_TOKEN}" \
+  -H "developer-token: ${DEVELOPER_TOKEN}"
+#+end_src
+
+Response:
+
+#+begin_src json
+{
+  "resourceNames": [
+    "customers/1234567890",
+    "customers/9876543210"
+  ]
+}
+#+end_src
+
+* Error Handling
+
+Errors return standard HTTP status codes with details:
+
+#+begin_src json
+{
+  "error": {
+    "code": 400,
+    "message": "Request contains an invalid argument.",
+    "status": "INVALID_ARGUMENT",
+    "details": [
+      {
+        "@type": "type.googleapis.com/google.ads.googleads.v23.errors.GoogleAdsFailure",
+        "errors": [
+          {
+            "errorCode": {
+              "queryError": "INVALID_SELECT_CLAUSE"
+            },
+            "message": "Invalid field in SELECT clause"
+          }
+        ]
+      }
+    ]
+  }
+}
+#+end_src
+
+* Pagination
+
+For =Search= (not =SearchStream=), handle pagination:
+
+#+begin_src bash
+# First request
+curl -X POST \
+  "https://googleads.googleapis.com/v23/customers/1234567890/googleAds:search" \
+  -H "Authorization: Bearer ${ACCESS_TOKEN}" \
+  -H "developer-token: ${DEVELOPER_TOKEN}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "SELECT campaign.id FROM campaign",
+    "pageSize": 100
+  }'
+
+# Subsequent requests with pageToken
+curl -X POST \
+  "https://googleads.googleapis.com/v23/customers/1234567890/googleAds:search" \
+  -H "Authorization: Bearer ${ACCESS_TOKEN}" \
+  -H "developer-token: ${DEVELOPER_TOKEN}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "SELECT campaign.id FROM campaign",
+    "pageSize": 100,
+    "pageToken": "<token_from_previous_response>"
+  }'
+#+end_src
+
+* Environment Setup
+
+Create a shell script for common variables:
+
+#+begin_src bash
+#!/bin/bash
+# env.sh - Source this before making API calls
+
+export CUSTOMER_ID="1234567890"
+export DEVELOPER_TOKEN="your-developer-token"
+
+# Get access token (requires gcloud auth)
+export ACCESS_TOKEN=$(gcloud auth print-access-token)
+#+end_src
+
+Usage:
+
+#+begin_src bash
+source env.sh
+
+curl -X POST \
+  "https://googleads.googleapis.com/v23/customers/${CUSTOMER_ID}/googleAds:search" \
+  -H "Authorization: Bearer ${ACCESS_TOKEN}" \
+  -H "developer-token: ${DEVELOPER_TOKEN}" \
+  -H "Content-Type: application/json" \
+  -d '{"query": "SELECT campaign.id, campaign.name FROM campaign LIMIT 5"}'
+#+end_src
+
+* Tools
+
+| Tool | Purpose |
+|------+---------|
+| [[https://developers.google.com/google-ads/api/docs/developer-toolkit/api-explorer][API Explorer]] | Interactive REST exploration |
+| [[https://developers.google.com/google-ads/api/docs/developer-toolkit/gaa-query-builder][Query Builder]] | Build GAQL queries |
+| [[https://developers.google.com/google-ads/api/docs/developer-toolkit/gaa-query-validator][Query Validator]] | Validate GAQL syntax |
+
+* Resources
+
+- [[https://developers.google.com/google-ads/api/rest/overview][REST Overview]]
+- [[https://developers.google.com/google-ads/api/rest/auth/overview][REST Authentication]]
+- [[https://developers.google.com/google-ads/api/reference/rest/v23/customers.googleAds/search][Search Method Reference]]

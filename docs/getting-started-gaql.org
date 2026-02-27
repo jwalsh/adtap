@@ -1,0 +1,217 @@
+#+TITLE: Getting Started with GAQL (Google Ads Query Language)
+#+AUTHOR: aygp-dr
+#+DATE: 2026-02-27
+#+OPTIONS: toc:2
+
+* Overview
+
+GAQL (Google Ads Query Language) is a SQL-like query language for retrieving
+data from the Google Ads API. This guide covers the fundamentals needed for
+read-only exploration.
+
+Reference: [[https://developers.google.com/google-ads/api/videos/catalog/gaql-2][GAQL Video - Query Structure & Grammar]]
+
+* Query Structure
+
+A GAQL query consists of these clauses:
+
+#+begin_example
+SELECT <field_list>
+FROM <resource>
+WHERE <conditions>
+ORDER BY <field> [ASC|DESC]
+LIMIT <count>
+#+end_example
+
+** Required Clauses
+
+| Clause | Required | Purpose |
+|--------+----------+---------|
+| SELECT | Yes | Fields to retrieve |
+| FROM | Yes | Resource to query |
+| WHERE | No | Filter conditions |
+| ORDER BY | No | Sort results |
+| LIMIT | No | Limit result count |
+
+* Basic Query Examples
+
+** List All Campaigns
+
+#+begin_src sql
+SELECT
+  campaign.id,
+  campaign.name,
+  campaign.status
+FROM campaign
+#+end_src
+
+** Campaigns with Metrics
+
+#+begin_src sql
+SELECT
+  campaign.id,
+  campaign.name,
+  metrics.impressions,
+  metrics.clicks,
+  metrics.cost_micros
+FROM campaign
+WHERE segments.date DURING LAST_7_DAYS
+#+end_src
+
+** Filter by Status
+
+#+begin_src sql
+SELECT
+  campaign.id,
+  campaign.name
+FROM campaign
+WHERE campaign.status = 'ENABLED'
+#+end_src
+
+* Field Categories
+
+GAQL fields fall into distinct categories:
+
+| Category | Example | Description |
+|----------+---------+-------------|
+| Resource | =campaign.id= | Entity attributes |
+| Metrics | =metrics.clicks= | Performance data |
+| Segments | =segments.date= | Data segmentation |
+
+* Common Resources
+
+| Resource | Description |
+|----------+-------------|
+| =campaign= | Campaign entities |
+| =ad_group= | Ad group entities |
+| =ad_group_ad= | Ads within ad groups |
+| =customer= | Account-level data |
+| =change_event= | Change history |
+
+* Date Ranges
+
+GAQL supports predefined date ranges:
+
+| Range | Description |
+|-------+-------------|
+| =TODAY= | Current day |
+| =YESTERDAY= | Previous day |
+| =LAST_7_DAYS= | Past 7 days |
+| =LAST_30_DAYS= | Past 30 days |
+| =THIS_MONTH= | Current month |
+| =LAST_MONTH= | Previous month |
+
+** Custom Date Range
+
+#+begin_src sql
+WHERE segments.date BETWEEN '2026-01-01' AND '2026-01-31'
+#+end_src
+
+* Operators
+
+** Comparison Operators
+
+| Operator | Example |
+|----------+---------|
+| === | =campaign.status = 'ENABLED'= |
+| =!== | =campaign.status != 'REMOVED'= |
+| =>= | =metrics.clicks > 100= |
+| =<= | =metrics.cost_micros < 1000000= |
+| =IN= | =campaign.status IN ('ENABLED', 'PAUSED')= |
+
+** Logical Operators
+
+#+begin_src sql
+WHERE campaign.status = 'ENABLED'
+  AND metrics.impressions > 0
+#+end_src
+
+* Sorting and Limiting
+
+** Order Results
+
+#+begin_src sql
+SELECT campaign.name, metrics.clicks
+FROM campaign
+WHERE segments.date DURING LAST_30_DAYS
+ORDER BY metrics.clicks DESC
+#+end_src
+
+** Limit Results
+
+#+begin_src sql
+SELECT campaign.name, metrics.conversions
+FROM campaign
+WHERE segments.date DURING LAST_30_DAYS
+ORDER BY metrics.conversions DESC
+LIMIT 10
+#+end_src
+
+* Segmentation
+
+Segments break down metrics by dimensions:
+
+#+begin_src sql
+SELECT
+  campaign.name,
+  segments.date,
+  segments.device,
+  metrics.clicks
+FROM campaign
+WHERE segments.date DURING LAST_7_DAYS
+#+end_src
+
+Common segments:
+- =segments.date= - Daily breakdown
+- =segments.device= - MOBILE, DESKTOP, TABLET
+- =segments.ad_network_type= - Network breakdown
+
+* Tools for Building Queries
+
+| Tool | Purpose | Link |
+|------+---------+------|
+| Query Builder | Interactive query construction | [[https://developers.google.com/google-ads/api/docs/developer-toolkit/gaa-query-builder][Link]] |
+| Query Validator | Validate query syntax | [[https://developers.google.com/google-ads/api/docs/developer-toolkit/gaa-query-validator][Link]] |
+
+* Common Patterns for Exploration
+
+** Campaign Overview
+
+#+begin_src sql
+SELECT
+  campaign.id,
+  campaign.name,
+  campaign.status,
+  campaign.advertising_channel_type,
+  campaign_budget.amount_micros,
+  metrics.impressions,
+  metrics.clicks,
+  metrics.conversions
+FROM campaign
+WHERE segments.date DURING LAST_30_DAYS
+  AND campaign.status != 'REMOVED'
+ORDER BY metrics.impressions DESC
+#+end_src
+
+** Ad Group Performance
+
+#+begin_src sql
+SELECT
+  ad_group.id,
+  ad_group.name,
+  ad_group.status,
+  campaign.name,
+  metrics.impressions,
+  metrics.clicks,
+  metrics.ctr
+FROM ad_group
+WHERE segments.date DURING LAST_30_DAYS
+ORDER BY metrics.clicks DESC
+LIMIT 20
+#+end_src
+
+* Resources
+
+- [[https://developers.google.com/google-ads/api/docs/query/overview][GAQL Overview]]
+- [[https://developers.google.com/google-ads/api/docs/query/grammar][GAQL Grammar Reference]]
+- [[https://developers.google.com/google-ads/api/fields/v23/overview][Field Reference v23]]
