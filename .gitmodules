@@ -7,3 +7,12 @@
 [submodule "vendor/google-ads-pb"]
 	path = vendor/google-ads-pb
 	url = https://github.com/shenzhencenter/google-ads-pb.git
+[submodule "vendor/google-ads-java"]
+	path = vendor/google-ads-java
+	url = https://github.com/googleads/google-ads-java.git
+[submodule "vendor/google-ads-python"]
+	path = vendor/google-ads-python
+	url = https://github.com/googleads/google-ads-python.git
+[submodule "vendor/google-ads-ruby"]
+	path = vendor/google-ads-ruby
+	url = https://github.com/googleads/google-ads-ruby.git

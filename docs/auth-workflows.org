@@ -1,0 +1,168 @@
+#+TITLE: Authentication Workflows
+#+AUTHOR: aygp-dr
+#+DATE: 2026-02-27
+#+OPTIONS: toc:2
+
+* Overview
+
+Google Ads API supports two primary authentication methods. Choose based on
+your use case.
+
+| Workflow | Use Case | Interactive |
+|----------+----------+-------------|
+| OAuth 2.0 | Interactive exploration | Yes |
+| Service Account | Scheduled/automated tasks | No |
+
+* OAuth 2.0 (Interactive)
+
+Best for: Manual exploration, development, debugging.
+
+** Flow
+
+#+begin_src mermaid :file images/oauth-flow.png
+sequenceDiagram
+    participant User
+    participant App
+    participant Google Auth
+    participant Google Ads API
+
+    User->>App: Start exploration
+    App->>Google Auth: Redirect to consent
+    Google Auth->>User: Request permission
+    User->>Google Auth: Grant access
+    Google Auth->>App: Authorization code
+    App->>Google Auth: Exchange for tokens
+    Google Auth->>App: Access + Refresh tokens
+    App->>Google Ads API: Request with Access Token
+    Google Ads API->>App: Response
+#+end_src
+
+** Setup
+
+1. Create OAuth 2.0 credentials in GCP Console
+2. Configure consent screen
+3. Use OAuth flow to obtain tokens
+
+** Token Management
+
+#+begin_src python
+from google.oauth2.credentials import Credentials
+from google.auth.transport.requests import Request
+
+def get_credentials():
+    creds = Credentials.from_authorized_user_file('token.json')
+    if creds.expired and creds.refresh_token:
+        creds.refresh(Request())
+    return creds
+#+end_src
+
+* Service Account (Automated)
+
+Best for: Scheduled tasks, vetting processes, automated exploration.
+
+Reference: [[https://developers.google.com/google-ads/api/docs/oauth/service-accounts][Service Account Documentation]]
+
+** When to Use
+
+- Scheduled data pulls for vetting
+- Automated report generation
+- CI/CD integration
+- Background processing
+
+** Requirements
+
+1. Google Workspace domain (for domain-wide delegation)
+2. Service account with domain-wide delegation enabled
+3. Appropriate OAuth scopes granted
+
+** Setup
+
+*** 1. Create Service Account
+
+#+begin_src bash
+gcloud iam service-accounts create adtap-automation \
+    --display-name="ADTAP Automation Service Account"
+#+end_src
+
+*** 2. Download Credentials
+
+#+begin_src bash
+gcloud iam service-accounts keys create service-account.json \
+    --iam-account=adtap-automation@PROJECT_ID.iam.gserviceaccount.com
+#+end_src
+
+*** 3. Enable Domain-Wide Delegation
+
+In Google Workspace Admin Console:
+1. Security → API Controls → Domain-wide Delegation
+2. Add client ID from service account
+3. Grant scope: =https://www.googleapis.com/auth/adwords=
+
+** Usage
+
+#+begin_src python
+from google.oauth2 import service_account
+from google.ads.googleads.client import GoogleAdsClient
+
+SCOPES = ['https://www.googleapis.com/auth/adwords']
+
+credentials = service_account.Credentials.from_service_account_file(
+    'service-account.json',
+    scopes=SCOPES,
+    subject='user@yourdomain.com'  # User to impersonate
+)
+
+client = GoogleAdsClient(credentials=credentials)
+#+end_src
+
+* Developer Token
+
+Required for both authentication methods.
+
+| Access Level | Description | Rate Limits |
+|--------------+-------------+-------------|
+| Test Account | Test accounts only | Limited |
+| Basic | Production access | Standard |
+| Standard | Full access | Higher |
+
+Obtain at: [[https://ads.google.com/aw/apicenter][API Center]]
+
+* Environment Variables
+
+#+begin_src bash
+# Required for all methods
+GOOGLE_ADS_DEVELOPER_TOKEN=your-22-char-token
+GOOGLE_PROJECT_ID=your-gcp-project
+
+# For OAuth
+GOOGLE_ADS_CLIENT_ID=your-client-id
+GOOGLE_ADS_CLIENT_SECRET=your-client-secret
+GOOGLE_ADS_REFRESH_TOKEN=your-refresh-token
+
+# For Service Account
+GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account.json
+#+end_src
+
+* Choosing Authentication Method
+
+#+begin_src mermaid :file images/auth-decision.png
+flowchart TD
+    A[Need API Access] --> B{Interactive?}
+    B -->|Yes| C[OAuth 2.0]
+    B -->|No| D{Have Workspace?}
+    D -->|Yes| E[Service Account]
+    D -->|No| F[OAuth with stored tokens]
+
+    C --> G[Manual exploration]
+    E --> H[Scheduled tasks]
+    F --> I[Limited automation]
+#+end_src
+
+* Security Considerations
+
+| Item | Guideline |
+|------+-----------|
+| Credentials | Never commit to git |
+| Tokens | Store securely, rotate regularly |
+| Scopes | Request minimum necessary |
+| Service Account | Limit domain delegation scope |
