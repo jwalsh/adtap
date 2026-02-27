@@ -1,0 +1,41 @@
+#+TITLE: ADTAP References
+#+AUTHOR: aygp-dr
+#+DATE: 2026-02-27
+
+* Videos
+
+- [[https://www.youtube.com/live/AKVBhjrKwAc][Google Ads API Reference Video]]
+
+* Google Ads API Protobuf Specifications
+
+** Current Versions (v20-v23)
+
+The official protobuf definitions are maintained at:
+- [[https://github.com/googleapis/googleapis/tree/master/google/ads/googleads][googleapis/googleapis - Google Ads protos]]
+
+** Version 10 (Sunset)
+
+Google Ads API v10 was sunset on *February 1, 2023*. It is no longer available in the current googleapis repository.
+
+To access historical v10 protos, you would need to:
+1. Clone the googleapis repo and check git history
+2. Find a commit before v10 was removed
+
+#+begin_src bash
+git clone https://github.com/googleapis/googleapis.git
+git log --oneline -- google/ads/googleads/v10
+#+end_src
+
+** Official Client Libraries
+
+- [[https://github.com/googleads/google-ads-python][Python Client Library]]
+- [[https://github.com/googleads/google-ads-php][PHP Client Library]]
+
+** Community Implementations
+
+- [[https://github.com/shenzhencenter/google-ads-pb][Go Protobuf Implementation (google-ads-pb)]]
+
+** Documentation
+
+- [[https://developers.google.com/google-ads/api/docs/sunset-dates][Deprecation and Sunset Dates]]
+- [[https://developers.google.com/google-ads/api/reference/rpc/v23/overview][Google Ads API v23 Reference]]

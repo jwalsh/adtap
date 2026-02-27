@@ -1,0 +1,416 @@
+#+TITLE: Google Ads API v23 - Entity Diagrams
+#+AUTHOR: aygp-dr
+#+DATE: 2026-02-27
+#+PROPERTY: header-args :exports both :eval no
+
+* Overview
+
+This document contains Mermaid diagrams for Google Ads API v23 entities,
+including ERD (Entity Relationship Diagrams), state machines, and sequence
+diagrams.
+
+Reference: [[https://developers.google.com/google-ads/api/reference/rpc/v23/overview][Google Ads API v23 Reference]]
+
+* Entity Relationship Diagram (ERD)
+
+** Core Account Hierarchy
+
+#+begin_src mermaid :file images/erd-core.png
+erDiagram
+    Customer ||--o{ Campaign : contains
+    Customer ||--o{ CampaignBudget : owns
+    Customer ||--o{ BiddingStrategy : owns
+    Customer ||--o{ Asset : owns
+    Customer ||--o{ Label : owns
+    Customer ||--o{ ConversionAction : defines
+
+    Campaign ||--o{ AdGroup : contains
+    Campaign }o--|| CampaignBudget : uses
+    Campaign }o--o| BiddingStrategy : uses
+    Campaign ||--o{ CampaignCriterion : has
+    Campaign ||--o{ CampaignLabel : tagged
+
+    AdGroup ||--o{ AdGroupAd : contains
+    AdGroup ||--o{ AdGroupCriterion : has
+    AdGroup ||--o{ AdGroupAsset : links
+    AdGroup ||--o{ AdGroupLabel : tagged
+
+    AdGroupAd }o--|| Ad : references
+    Ad ||--o{ AdGroupAdAsset : uses
+
+    Asset ||--o{ AdGroupAsset : linked_to
+    Asset ||--o{ CampaignAsset : linked_to
+    Label ||--o{ CampaignLabel : applied
+    Label ||--o{ AdGroupLabel : applied
+#+end_src
+
+** Asset and Creative Structure
+
+#+begin_src mermaid :file images/erd-assets.png
+erDiagram
+    Customer ||--o{ AssetGroup : owns
+    Customer ||--o{ AssetSet : owns
+
+    Campaign ||--o{ AssetGroup : contains
+
+    AssetGroup ||--o{ AssetGroupAsset : contains
+    AssetGroup ||--o{ AssetGroupSignal : has
+
+    AssetSet ||--o{ AssetSetAsset : contains
+    AssetSet ||--o{ CampaignAssetSet : linked_to
+
+    Asset ||--o{ AssetGroupAsset : used_in
+    Asset ||--o{ AssetSetAsset : member_of
+
+    Asset {
+        string resource_name PK
+        AssetType type
+        string name
+    }
+
+    AssetGroup {
+        string resource_name PK
+        string name
+        AssetGroupStatus status
+    }
+
+    AssetSet {
+        string resource_name PK
+        string name
+        AssetSetType type
+    }
+#+end_src
+
+** Bidding and Budget
+
+#+begin_src mermaid :file images/erd-bidding.png
+erDiagram
+    Customer ||--o{ BiddingStrategy : owns
+    Customer ||--o{ CampaignBudget : owns
+
+    BiddingStrategy {
+        string resource_name PK
+        BiddingStrategyType type
+        string name
+        int64 campaign_count
+    }
+
+    CampaignBudget {
+        string resource_name PK
+        string name
+        int64 amount_micros
+        BudgetDeliveryMethod delivery_method
+        BudgetPeriod period
+    }
+
+    Campaign }o--o| BiddingStrategy : uses_portfolio
+    Campaign }o--|| CampaignBudget : assigned
+    Campaign ||--o{ CampaignBidModifier : has
+
+    CampaignBidModifier {
+        string resource_name PK
+        double bid_modifier
+    }
+
+    AdGroup ||--o{ AdGroupBidModifier : has
+
+    AdGroupBidModifier {
+        string resource_name PK
+        double bid_modifier
+    }
+#+end_src
+
+* State Machine Diagrams
+
+** Campaign Status States
+
+#+begin_src mermaid :file images/state-campaign.png
+stateDiagram-v2
+    [*] --> UNSPECIFIED: Create
+    UNSPECIFIED --> ENABLED: Set status
+    UNSPECIFIED --> PAUSED: Set status
+
+    ENABLED --> PAUSED: Pause
+    PAUSED --> ENABLED: Enable
+
+    ENABLED --> REMOVED: Remove
+    PAUSED --> REMOVED: Remove
+
+    REMOVED --> [*]
+
+    note right of ENABLED
+        Campaign is active
+        and serving ads
+    end note
+
+    note right of PAUSED
+        Campaign exists but
+        not serving ads
+    end note
+
+    note right of REMOVED
+        Soft delete - data
+        retained for reporting
+    end note
+#+end_src
+
+** AdGroup Status States
+
+#+begin_src mermaid :file images/state-adgroup.png
+stateDiagram-v2
+    [*] --> UNSPECIFIED: Create
+    UNSPECIFIED --> ENABLED: Set status
+    UNSPECIFIED --> PAUSED: Set status
+
+    ENABLED --> PAUSED: Pause
+    PAUSED --> ENABLED: Enable
+
+    ENABLED --> REMOVED: Remove
+    PAUSED --> REMOVED: Remove
+
+    REMOVED --> [*]
+
+    state ENABLED {
+        [*] --> Serving
+        Serving --> Limited: Budget/Bid issues
+        Limited --> Serving: Issues resolved
+    }
+#+end_src
+
+** Ad Approval Status States
+
+#+begin_src mermaid :file images/state-ad-approval.png
+stateDiagram-v2
+    [*] --> REVIEW_IN_PROGRESS: Submit Ad
+
+    REVIEW_IN_PROGRESS --> APPROVED: Pass review
+    REVIEW_IN_PROGRESS --> APPROVED_LIMITED: Partial approval
+    REVIEW_IN_PROGRESS --> DISAPPROVED: Fail review
+    REVIEW_IN_PROGRESS --> AREA_OF_INTEREST_ONLY: Geographic limit
+
+    APPROVED --> REVIEW_IN_PROGRESS: Edit ad
+    APPROVED_LIMITED --> REVIEW_IN_PROGRESS: Edit ad
+    DISAPPROVED --> REVIEW_IN_PROGRESS: Edit ad
+
+    DISAPPROVED --> [*]: Remove
+    APPROVED --> [*]: Remove
+#+end_src
+
+** Conversion Action Status States
+
+#+begin_src mermaid :file images/state-conversion.png
+stateDiagram-v2
+    [*] --> ENABLED: Create
+
+    ENABLED --> PAUSED: Pause tracking
+    PAUSED --> ENABLED: Resume tracking
+
+    ENABLED --> REMOVED: Remove
+    PAUSED --> REMOVED: Remove
+
+    HIDDEN --> ENABLED: Unhide
+    ENABLED --> HIDDEN: Hide
+
+    REMOVED --> [*]
+#+end_src
+
+* Sequence Diagrams
+
+** Create Campaign Flow
+
+#+begin_src mermaid :file images/seq-create-campaign.png
+sequenceDiagram
+    participant Client
+    participant GoogleAdsService
+    participant CampaignBudgetService
+    participant CampaignService
+    participant ValidationService
+
+    Client->>GoogleAdsService: Mutate (batch operations)
+    activate GoogleAdsService
+
+    GoogleAdsService->>ValidationService: Validate operations
+    ValidationService-->>GoogleAdsService: Validation result
+
+    alt Validation Failed
+        GoogleAdsService-->>Client: Error response
+    else Validation Passed
+        GoogleAdsService->>CampaignBudgetService: Create budget
+        CampaignBudgetService-->>GoogleAdsService: Budget resource name
+
+        GoogleAdsService->>CampaignService: Create campaign
+        Note right of CampaignService: Uses temporary<br/>resource name<br/>for budget reference
+        CampaignService-->>GoogleAdsService: Campaign resource name
+
+        GoogleAdsService-->>Client: MutateResponse
+    end
+    deactivate GoogleAdsService
+#+end_src
+
+** Create Full Campaign Structure
+
+#+begin_src mermaid :file images/seq-full-campaign.png
+sequenceDiagram
+    participant Client
+    participant GoogleAdsService
+    participant BudgetSvc as CampaignBudgetService
+    participant CampaignSvc as CampaignService
+    participant AdGroupSvc as AdGroupService
+    participant AdSvc as AdGroupAdService
+
+    Client->>GoogleAdsService: Mutate (all operations)
+    activate GoogleAdsService
+
+    Note over GoogleAdsService: Operations grouped by resource type
+
+    GoogleAdsService->>BudgetSvc: 1. Create CampaignBudget
+    BudgetSvc-->>GoogleAdsService: customers/123/campaignBudgets/456
+
+    GoogleAdsService->>CampaignSvc: 2. Create Campaign
+    Note right of CampaignSvc: References budget via<br/>temp resource name
+    CampaignSvc-->>GoogleAdsService: customers/123/campaigns/789
+
+    GoogleAdsService->>AdGroupSvc: 3. Create AdGroup(s)
+    AdGroupSvc-->>GoogleAdsService: customers/123/adGroups/111
+
+    GoogleAdsService->>AdSvc: 4. Create AdGroupAd(s)
+    AdSvc-->>GoogleAdsService: customers/123/adGroupAds/222~333
+
+    GoogleAdsService-->>Client: MutateResponse (all resource names)
+    deactivate GoogleAdsService
+#+end_src
+
+** Search Query Flow
+
+#+begin_src mermaid :file images/seq-search.png
+sequenceDiagram
+    participant Client
+    participant GoogleAdsService
+    participant QueryParser
+    participant ResourceStore
+
+    Client->>GoogleAdsService: Search(customer_id, query)
+    activate GoogleAdsService
+
+    GoogleAdsService->>QueryParser: Parse GAQL query
+    QueryParser-->>GoogleAdsService: Parsed query AST
+
+    GoogleAdsService->>ResourceStore: Execute query
+    Note right of ResourceStore: SELECT campaign.id,<br/>campaign.name,<br/>metrics.clicks<br/>FROM campaign<br/>WHERE...
+
+    ResourceStore-->>GoogleAdsService: Result rows
+
+    GoogleAdsService-->>Client: SearchResponse (paginated)
+    deactivate GoogleAdsService
+
+    opt More pages
+        Client->>GoogleAdsService: Search(page_token)
+        GoogleAdsService-->>Client: SearchResponse (next page)
+    end
+#+end_src
+
+** SearchStream Flow
+
+#+begin_src mermaid :file images/seq-searchstream.png
+sequenceDiagram
+    participant Client
+    participant GoogleAdsService
+    participant ResourceStore
+
+    Client->>GoogleAdsService: SearchStream(customer_id, query)
+    activate GoogleAdsService
+
+    GoogleAdsService->>ResourceStore: Execute query
+
+    loop Stream batches
+        ResourceStore-->>GoogleAdsService: Batch of rows
+        GoogleAdsService-->>Client: SearchGoogleAdsStreamResponse
+    end
+
+    GoogleAdsService-->>Client: Stream complete
+    deactivate GoogleAdsService
+#+end_src
+
+** Mutate with Partial Failure
+
+#+begin_src mermaid :file images/seq-partial-failure.png
+sequenceDiagram
+    participant Client
+    participant GoogleAdsService
+    participant CampaignService
+
+    Client->>GoogleAdsService: Mutate(operations, partial_failure=true)
+    activate GoogleAdsService
+
+    GoogleAdsService->>CampaignService: Process operations
+
+    Note over CampaignService: Op 1: Success<br/>Op 2: Failure (invalid)<br/>Op 3: Success
+
+    CampaignService-->>GoogleAdsService: Mixed results
+
+    GoogleAdsService-->>Client: MutateResponse
+    Note right of Client: results[0]: resource_name<br/>results[1]: empty<br/>results[2]: resource_name<br/>partial_failure_error: details for op 2
+
+    deactivate GoogleAdsService
+#+end_src
+
+* Service Interaction Overview
+
+#+begin_src mermaid :file images/service-overview.png
+flowchart TB
+    subgraph Client["Client Application"]
+        App[Application Code]
+    end
+
+    subgraph Services["Google Ads API v23 Services"]
+        GAS[GoogleAdsService]
+        CS[CampaignService]
+        AGS[AdGroupService]
+        ADS[AdGroupAdService]
+        CBS[CampaignBudgetService]
+        BS[BiddingStrategyService]
+    end
+
+    subgraph Operations["Operation Types"]
+        Search[Search / SearchStream]
+        Mutate[Mutate]
+    end
+
+    App --> GAS
+    GAS --> Search
+    GAS --> Mutate
+
+    Mutate --> CS
+    Mutate --> AGS
+    Mutate --> ADS
+    Mutate --> CBS
+    Mutate --> BS
+
+    style GAS fill:#e1f5fe
+    style Search fill:#c8e6c9
+    style Mutate fill:#ffecb3
+#+end_src
+
+* Appendix: Entity Status Enums
+
+| Entity           | Status Values                                              |
+|------------------+------------------------------------------------------------|
+| Campaign         | UNSPECIFIED, UNKNOWN, ENABLED, PAUSED, REMOVED             |
+| AdGroup          | UNSPECIFIED, UNKNOWN, ENABLED, PAUSED, REMOVED             |
+| AdGroupAd        | UNSPECIFIED, UNKNOWN, ENABLED, PAUSED, REMOVED             |
+| Asset            | UNSPECIFIED, UNKNOWN, ENABLED, REMOVED                     |
+| BiddingStrategy  | UNSPECIFIED, UNKNOWN, ENABLED, REMOVED                     |
+| CampaignBudget   | UNSPECIFIED, UNKNOWN, ENABLED, REMOVED                     |
+| ConversionAction | UNSPECIFIED, UNKNOWN, ENABLED, REMOVED, HIDDEN             |
+
+* Appendix: Ad Approval Status Enums
+
+| Value                 | Description                                    |
+|-----------------------+------------------------------------------------|
+| UNSPECIFIED           | Not specified                                  |
+| UNKNOWN               | Unknown value                                  |
+| APPROVED              | Approved for all regions                       |
+| APPROVED_LIMITED      | Approved with restrictions                     |
+| DISAPPROVED           | Not approved, cannot serve                     |
+| REVIEW_IN_PROGRESS    | Under review                                   |
+| AREA_OF_INTEREST_ONLY | Approved only for area of interest targeting  |
