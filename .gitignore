@@ -54,3 +54,17 @@ logs/
 tmp/
 temp/
 *.tmp
+
+# Live API data - NEVER commit
+data/
+api-responses/
+*.api-response.json
+
+# Gastown transient directories
+witness/
+refinery/
+mayor/
+
+# Keep beads config but ignore db
+.beads/*.db
+.beads/*.db-*
